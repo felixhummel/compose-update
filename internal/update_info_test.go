@@ -28,7 +28,7 @@ func TestHasNewVersion(t *testing.T) {
 				CurrentTag: tt.currentTag,
 				LatestTag:  tt.latestTag,
 			}
-			if got := u.HasNewVersion(true, true, true); got != tt.expected {
+			if got := u.HasNewVersion(); got != tt.expected {
 				t.Errorf("HasNewVersion() = %v, want %v", got, tt.expected)
 			}
 		})

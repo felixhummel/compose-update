@@ -62,5 +62,5 @@ func main() {
 	}
 
 	wg.Wait()
-	modes.Default(updateInfos, ccuFlags)
+	modes.Default(updateInfos)
 }
