@@ -3,6 +3,7 @@ package internal
 import (
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -74,6 +75,7 @@ func FindLatestVersion(current *semver.Version, tags []string, major, minor, pat
 }
 
 func isValidSemver(tag string) bool {
+	tag = strings.TrimPrefix(tag, "v")
 	regex := regexp.MustCompile(`^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
 	matches := regex.FindStringSubmatch(tag)
 	return len(matches) > 0

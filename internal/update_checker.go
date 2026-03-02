@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -19,7 +20,7 @@ type UpdateChecker struct {
 
 func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
 	if registry == nil {
-		registry = NewRegistry("")
+		registry = NewRegistryWithTimeout(5 * time.Second)
 	}
 	return &UpdateChecker{path: path, registry: registry}
 }
@@ -42,7 +43,7 @@ func (u *UpdateChecker) Check(major, minor, patch bool) ([]UpdateInfo, error) {
 		go func(i int, updateInfo UpdateInfo, version *semver.Version) {
 			defer wg.Done()
 			slog.Info("Checking image", "image", updateInfo.FullImageName)
-			tags, err := u.registry.FetchImageTags(updateInfo.ImageName)
+			tags, err := u.registry.FetchImageTags(updateInfo.FullImageName)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Skipping (failed fetching tags) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
 				return

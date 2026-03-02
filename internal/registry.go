@@ -7,33 +7,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/Masterminds/semver/v3"
 )
-
-func get(ctx context.Context, client *http.Client, url string) (*http.Response, time.Duration, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	return do(client, req)
-}
-
-func do(client *http.Client, req *http.Request) (*http.Response, time.Duration, error) {
-	start := time.Now()
-	resp, err := client.Do(req)
-	elapsed := time.Since(start)
-	slog.Debug("GET", "url", req.URL, "elapsed", elapsed, "status", statusCode(resp), "err", err)
-	return resp, elapsed, err
-}
-
-func statusCode(resp *http.Response) int {
-	if resp == nil {
-		return 0
-	}
-	return resp.StatusCode
-}
 
 type IRegistry interface {
 	FetchImageTags(image string) ([]string, error)
@@ -42,16 +22,36 @@ type IRegistry interface {
 type Registry struct {
 	client  *http.Client
 	timeout time.Duration
-	// testURL overrides the registry base URL for all images (used in tests)
-	testURL string
-}
-
-func NewRegistry(url string) *Registry {
-	return &Registry{client: &http.Client{Timeout: 5 * time.Second}, timeout: 5 * time.Second, testURL: url}
 }
 
 func NewRegistryWithTimeout(timeout time.Duration) *Registry {
 	return &Registry{client: &http.Client{Timeout: timeout}, timeout: timeout}
+}
+
+// NewRegistryForTest returns a Registry that redirects all HTTP requests to
+// serverURL, preserving path and query. This lets tests route by URL path
+// instead of bypassing registry logic entirely.
+func NewRegistryForTest(serverURL string) *Registry {
+	var transport http.RoundTripper
+	if serverURL != "" {
+		u, _ := url.Parse(serverURL)
+		transport = &redirectTransport{scheme: u.Scheme, host: u.Host}
+	}
+	return &Registry{
+		client:  &http.Client{Timeout: 5 * time.Second, Transport: transport},
+		timeout: 5 * time.Second,
+	}
+}
+
+// redirectTransport rewrites every request's host to a fixed test server,
+// while preserving the original path and query string.
+type redirectTransport struct{ scheme, host string }
+
+func (t *redirectTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.URL.Scheme = t.scheme
+	req.URL.Host = t.host
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 // parseImageRef returns the registry host and repository for an image name.
@@ -76,25 +76,86 @@ func isDockerHub(registry string) bool {
 	return registry == "registry-1.docker.io" || registry == "docker.io"
 }
 
+func hasSemver(tags []string) bool {
+	for _, tag := range tags {
+		if _, err := semver.NewVersion(tag); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Registry) FetchImageTags(image string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 	defer cancel()
 
-	repo := strings.Split(image, ":")[0]
-
-	if r.testURL != "" {
-		return r.fetchTags(ctx, r.testURL, repo, "")
+	parts := strings.SplitN(image, ":", 2)
+	currentTag := ""
+	if len(parts) == 2 {
+		currentTag = parts[1]
 	}
 
 	registry, repo := parseImageRef(image)
 	baseURL := "https://" + registry
 
+	// For Docker Hub with a v-prefixed current tag: try the web API name=v filter first
+	// (fetches only v-prefixed tags, ordered by last_updated — usually 1-2 pages)
+	if isDockerHub(registry) && strings.HasPrefix(currentTag, "v") {
+		tags, err := r.fetchDockerHubVPrefix(ctx, repo)
+		if err == nil && hasSemver(tags) {
+			slog.Debug("Using v-prefix tags from Docker Hub web API", "repo", repo, "count", len(tags))
+			return tags, nil
+		}
+	}
+
+	// Fall back to OCI API with early stop when pages contain no semver tags
 	token, err := r.fetchToken(ctx, baseURL, registry, repo)
 	if err != nil {
 		return nil, err
 	}
+	return r.fetchTagsOCI(ctx, baseURL, repo, token)
+}
 
-	return r.fetchTags(ctx, baseURL, repo, token)
+// fetchDockerHubVPrefix fetches tags from the Docker Hub web API filtered to name=v,
+// ordered by last_updated descending. Returns all pages that contain semver tags.
+func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]string, error) {
+	var tags []string
+	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?name=v&page_size=100&ordering=-last_updated", repo)
+
+	for url != "" {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, _, err := do(r.client, req)
+		if err != nil {
+			return nil, err
+		}
+
+		var result struct {
+			Results []struct {
+				Name string `json:"name"`
+			} `json:"results"`
+			Next string `json:"next"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		var page []string
+		for _, t := range result.Results {
+			page = append(page, t.Name)
+		}
+		tags = append(tags, page...)
+
+		// Stop when a page has no semver tags — we've left the semver range
+		if !hasSemver(page) {
+			break
+		}
+		url = result.Next
+	}
+
+	return tags, nil
 }
 
 // fetchToken gets a bearer token for the given registry and repository.
@@ -172,7 +233,9 @@ func parseBearer(wwwAuth string) (realm, queryParams string, err error) {
 	return realm, strings.Join(parts, "&"), nil
 }
 
-func (r *Registry) fetchTags(ctx context.Context, baseURL, repo, token string) ([]string, error) {
+// fetchTagsOCI paginates the OCI tags/list endpoint and stops early when a page
+// contains no semver tags (we've left the semver range) or the context deadline fires.
+func (r *Registry) fetchTagsOCI(ctx context.Context, baseURL, repo, token string) ([]string, error) {
 	var tags []string
 	url := fmt.Sprintf("%s/v2/%s/tags/list?n=100", baseURL, repo)
 
@@ -187,7 +250,6 @@ func (r *Registry) fetchTags(ctx context.Context, baseURL, repo, token string) (
 
 		resp, _, err := do(r.client, req)
 		if err != nil {
-			// Deadline exceeded mid-pagination: return what we have so far
 			if ctx.Err() != nil {
 				slog.Debug("Stopping pagination (deadline exceeded)", "repo", repo, "tags_so_far", len(tags))
 				return tags, nil
@@ -204,18 +266,45 @@ func (r *Registry) fetchTags(ctx context.Context, baseURL, repo, token string) (
 		var result struct {
 			Tags []string `json:"tags"`
 		}
-		err = json.NewDecoder(resp.Body).Decode(&result)
+		json.NewDecoder(resp.Body).Decode(&result)
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
-		if err != nil {
-			return nil, err
-		}
+
 		tags = append(tags, result.Tags...)
+
+		// Stop when a page has no semver tags — we've left the semver range
+		if !hasSemver(result.Tags) {
+			slog.Debug("Stopping pagination (no semver on page)", "repo", repo, "tags_so_far", len(tags))
+			break
+		}
 
 		url = parseLinkNext(resp.Header.Get("Link"), baseURL)
 	}
 
 	return tags, nil
+}
+
+func get(ctx context.Context, client *http.Client, url string) (*http.Response, time.Duration, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	return do(client, req)
+}
+
+func do(client *http.Client, req *http.Request) (*http.Response, time.Duration, error) {
+	start := time.Now()
+	resp, err := client.Do(req)
+	elapsed := time.Since(start)
+	slog.Debug("GET", "url", req.URL, "elapsed", elapsed, "status", statusCode(resp), "err", err)
+	return resp, elapsed, err
+}
+
+func statusCode(resp *http.Response) int {
+	if resp == nil {
+		return 0
+	}
+	return resp.StatusCode
 }
 
 // parseLinkNext parses the Link header for the next page URL.

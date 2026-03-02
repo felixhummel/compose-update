@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,7 +140,6 @@ services:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a temporary file with the test data
 			file, err := os.CreateTemp("", "testfile.yaml")
 			assert.NoError(t, err)
 			defer os.Remove(file.Name())
@@ -148,34 +148,19 @@ services:
 			assert.NoError(t, err)
 			file.Close()
 
-			// Update the expected FilePath to match the temporary file name
 			for i := range tt.expected {
 				tt.expected[i].FilePath = file.Name()
 			}
 
-			// Create an UpdateChecker instance
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"tags": ["1.18.0", "1.18.1", "1.19.0", "1.20.0"]}`))
-			}))
-			defer server.Close()
-
-			registry := NewRegistry(server.URL)
-			updateChecker := NewUpdateChecker(file.Name(), registry)
-
-			// Call createUpdateInfos
+			updateChecker := NewUpdateChecker(file.Name(), NewRegistryForTest(""))
 			updateInfos, err := updateChecker.createUpdateInfos()
 			assert.NoError(t, err)
-
-			// Verify the results
 			assert.Equal(t, tt.expected, updateInfos)
 		})
 	}
 }
 
 func TestUpdateCheckerCheck(t *testing.T) {
-	mockTags := `{"tags": ["1.18.0", "1.18.1", "1.19.0", "1.20.0"]}`
-
 	tests := []struct {
 		name     string
 		fileData string
@@ -192,7 +177,7 @@ image: library/myimage:1.19.0
 					FullImageName: "library/myimage:1.19.0",
 					ImageName:     "library/myimage",
 					CurrentTag:    "1.19.0",
-					LatestTag:     "1.20.0",
+					LatestTag:     "999.0.0",
 				},
 			},
 		},
@@ -212,7 +197,7 @@ services:
 					FullImageName: "caddy:1.19.0",
 					ImageName:     "caddy",
 					CurrentTag:    "1.19.0",
-					LatestTag:     "1.20.0",
+					LatestTag:     "999.0.0",
 				},
 			},
 		},
@@ -220,7 +205,6 @@ services:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a temporary file with the test data
 			file, err := os.CreateTemp("", "testfile.yaml")
 			assert.NoError(t, err)
 			defer os.Remove(file.Name())
@@ -229,18 +213,14 @@ services:
 			assert.NoError(t, err)
 			file.Close()
 
-			// Update the expected FilePath to match the temporary file name
 			for i := range tt.expected {
 				tt.expected[i].FilePath = file.Name()
 			}
 
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(mockTags))
-			}))
+			server := mockRegistryServer()
 			defer server.Close()
 
-			registry := NewRegistry(server.URL)
+			registry := NewRegistryForTest(server.URL)
 			updateChecker := NewUpdateChecker(file.Name(), registry)
 
 			result, err := updateChecker.Check(true, true, true)
@@ -251,27 +231,50 @@ services:
 }
 
 func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
+	// The fixture has both v-prefixed (prom/prometheus:v3.7.2, prom/node-exporter:v1.10.2)
+	// and non-prefixed (caddy:1.19.0, authelia/authelia:4.39, grafana/grafana:12.3.4) images.
+	// The mock server routes each case to the appropriate response format.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"tags": ["1.18.0", "1.18.1", "1.19.0", "1.20.0"]}`))
+		switch {
+		case strings.Contains(r.URL.RawQuery, "service=") && strings.Contains(r.URL.RawQuery, "scope="):
+			// Token endpoint
+			w.Write([]byte(`{"token": "test"}`))
+		case strings.HasPrefix(r.URL.Path, "/v2/repositories/") && strings.Contains(r.URL.RawQuery, "name=v"):
+			// Docker Hub web API: v-prefixed images (prometheus, node-exporter)
+			w.Write([]byte(`{"results": [{"name": "v999.0.0"}], "next": null}`))
+		default:
+			// OCI tags/list: non-prefixed images (caddy, authelia, grafana)
+			w.Write([]byte(`{"tags": ["999.0.0"]}`))
+		}
 	}))
 	defer server.Close()
 
-	registry := NewRegistry(server.URL)
+	registry := NewRegistryForTest(server.URL)
 	updateChecker := NewUpdateChecker("../tests/build-arg-img/docker-compose.yml", registry)
 
 	result, err := updateChecker.Check(true, true, true)
 	assert.NoError(t, err)
 
-	// caddy:1.19.0 should be detected as updatable to 1.20.0
-	var caddyInfo *UpdateInfo
-	for i := range result {
-		if result[i].ImageName == "caddy" {
-			caddyInfo = &result[i]
-			break
-		}
+	byImage := make(map[string]UpdateInfo)
+	for _, r := range result {
+		byImage[r.ImageName] = r
 	}
-	assert.NotNil(t, caddyInfo, "caddy IMG entry not found")
-	assert.Equal(t, "1.19.0", caddyInfo.CurrentTag)
-	assert.Equal(t, "1.20.0", caddyInfo.LatestTag)
+
+	// v-prefixed: goes through Docker Hub name=v path → mock returns v999.0.0
+	assert.Equal(t, "v3.7.2", byImage["prom/prometheus"].CurrentTag)
+	assert.Equal(t, "v999.0.0", byImage["prom/prometheus"].LatestTag)
+
+	assert.Equal(t, "v1.10.2", byImage["prom/node-exporter"].CurrentTag)
+	assert.Equal(t, "v999.0.0", byImage["prom/node-exporter"].LatestTag)
+
+	// non-prefixed: goes through OCI path → mock returns 999.0.0
+	assert.Equal(t, "1.19.0", byImage["caddy"].CurrentTag)
+	assert.Equal(t, "999.0.0", byImage["caddy"].LatestTag)
+
+	assert.Equal(t, "4.39", byImage["authelia/authelia"].CurrentTag)
+	// 4.39 is parsed as 4.39.0 by Masterminds semver (lenient) → OCI path → update found
+	assert.Equal(t, "999.0.0", byImage["authelia/authelia"].LatestTag)
+
+	assert.Equal(t, "12.3.4", byImage["grafana/grafana"].CurrentTag)
+	assert.Equal(t, "999.0.0", byImage["grafana/grafana"].LatestTag)
 }
