@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -29,6 +30,7 @@ func (u *UpdateChecker) Check(major, minor, patch bool) ([]UpdateInfo, error) {
 		return nil, err
 	}
 
+	var wg sync.WaitGroup
 	for i, updateInfo := range updateInfos {
 		version, err := semver.NewVersion(updateInfo.CurrentTag)
 		if err != nil {
@@ -36,17 +38,22 @@ func (u *UpdateChecker) Check(major, minor, patch bool) ([]UpdateInfo, error) {
 			continue
 		}
 
-		tags, err := u.registry.FetchImageTags(updateInfo.ImageName)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Skipping (failed fetching tags) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
-			continue
-		}
+		wg.Add(1)
+		go func(i int, updateInfo UpdateInfo, version *semver.Version) {
+			defer wg.Done()
+			tags, err := u.registry.FetchImageTags(updateInfo.ImageName)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Skipping (failed fetching tags) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
+				return
+			}
 
-		latestVersion := FindLatestVersion(version, tags, major, minor, patch)
-		if latestVersion != "" {
-			updateInfos[i].LatestTag = latestVersion
-		}
+			latestVersion := FindLatestVersion(version, tags, major, minor, patch)
+			if latestVersion != "" {
+				updateInfos[i].LatestTag = latestVersion
+			}
+		}(i, updateInfo, version)
 	}
+	wg.Wait()
 
 	return updateInfos, nil
 }
