@@ -3,6 +3,7 @@ package internal
 import (
 	"os"
 	"testing"
+	"time"
 
 	flag "github.com/spf13/pflag"
 )
@@ -27,6 +28,7 @@ func TestParse(t *testing.T) {
 				Minor:       false,
 				Patch:       true,
 				LogLevel:    "warning",
+				MaxTime:     5 * time.Second,
 			},
 		},
 		{
@@ -37,6 +39,7 @@ func TestParse(t *testing.T) {
 				Directory: ".",
 				Patch:     true,
 				LogLevel:  "warning",
+				MaxTime:   5 * time.Second,
 			},
 		},
 		{
@@ -49,6 +52,7 @@ func TestParse(t *testing.T) {
 				Directory: ".",
 				Patch:     true,
 				LogLevel:  "warning",
+				MaxTime:   5 * time.Second,
 			},
 		},
 		{
@@ -58,6 +62,7 @@ func TestParse(t *testing.T) {
 				Directory: "/path/to/dir",
 				Patch:     true,
 				LogLevel:  "warning",
+				MaxTime:   5 * time.Second,
 			},
 		},
 	}

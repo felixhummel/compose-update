@@ -11,7 +11,7 @@ import (
 func TestFetchImageTags_ValidImageWithTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"count": 2, "results": [{"name": "latest"}, {"name": "18.04"}, {"name": "20.04"}, {"name": "22.04"}],"next": null}`))
+		w.Write([]byte(`{"name": "library/ubuntu", "tags": ["latest", "18.04", "20.04", "22.04"]}`))
 	}))
 	defer server.Close()
 
@@ -19,5 +19,5 @@ func TestFetchImageTags_ValidImageWithTags(t *testing.T) {
 	gotTags, err := registry.FetchImageTags("library/ubuntu")
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"latest", "18.04","20.04","22.04"}, gotTags)
+	assert.Equal(t, []string{"latest", "18.04", "20.04", "22.04"}, gotTags)
 }

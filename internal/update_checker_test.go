@@ -156,12 +156,7 @@ services:
 			// Create an UpdateChecker instance
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"count": 2, "results": [
-					{"name": "1.18.0"},
-					{"name": "1.18.1"},
-					{"name": "1.19.0"},
-					{"name": "1.20.0"}
-				],"next": null}`))
+				w.Write([]byte(`{"tags": ["1.18.0", "1.18.1", "1.19.0", "1.20.0"]}`))
 			}))
 			defer server.Close()
 
@@ -179,12 +174,7 @@ services:
 }
 
 func TestUpdateCheckerCheck(t *testing.T) {
-	mockTags := `{"count": 4, "results": [
-		{"name": "1.18.0"},
-		{"name": "1.18.1"},
-		{"name": "1.19.0"},
-		{"name": "1.20.0"}
-	],"next": null}`
+	mockTags := `{"tags": ["1.18.0", "1.18.1", "1.19.0", "1.20.0"]}`
 
 	tests := []struct {
 		name     string
@@ -263,12 +253,7 @@ services:
 func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"count": 4, "results": [
-			{"name": "1.18.0"},
-			{"name": "1.18.1"},
-			{"name": "1.19.0"},
-			{"name": "1.20.0"}
-		],"next": null}`))
+		w.Write([]byte(`{"tags": ["1.18.0", "1.18.1", "1.19.0", "1.20.0"]}`))
 	}))
 	defer server.Close()
 

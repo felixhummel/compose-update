@@ -50,7 +50,7 @@ func main() {
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
-			updateChecker := internal.NewUpdateChecker(path, internal.NewRegistry(""))
+			updateChecker := internal.NewUpdateChecker(path, internal.NewRegistryWithTimeout(ccuFlags.MaxTime))
 			info, err := updateChecker.Check(ccuFlags.Major, ccuFlags.Minor, ccuFlags.Patch)
 			if err != nil {
 				slog.Error("Error checking for updates", "error", err)
