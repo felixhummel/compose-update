@@ -23,3 +23,5 @@ services:
 
   # pytorch:
   #   image: pytorch/pytorch:1.8.1-cuda11.1-cudnn8-runtime
+  forgejo:
+    image: data.forgejo.org/forgejo/forgejo:14
