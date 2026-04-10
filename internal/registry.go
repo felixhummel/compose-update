@@ -210,9 +210,21 @@ func (r *Registry) doTokenRequest(ctx context.Context, tokenURL string) (string,
 
 // parseBearer parses a WWW-Authenticate: Bearer header and returns the realm
 // and query parameters string (e.g. "service=...&scope=...").
+// The header may contain multiple schemes (e.g. "Bearer ..., Basic ..."); only
+// the Bearer section is parsed.
 func parseBearer(wwwAuth string) (realm, queryParams string, err error) {
+	// Extract only the Bearer scheme section (up to the next scheme keyword or end)
+	bearerSection := wwwAuth
+	if i := strings.Index(wwwAuth, "Bearer "); i >= 0 {
+		bearerSection = wwwAuth[i+len("Bearer "):]
+		// Trim at the next auth scheme (word followed by space+quote or space+word+"=")
+		if m := regexp.MustCompile(`,\s*\w+ \w+=`).FindStringIndex(bearerSection); m != nil {
+			bearerSection = bearerSection[:m[0]]
+		}
+	}
+
 	re := regexp.MustCompile(`(\w+)="([^"]*)"`)
-	matches := re.FindAllStringSubmatch(wwwAuth, -1)
+	matches := re.FindAllStringSubmatch(bearerSection, -1)
 
 	params := make(map[string]string)
 	for _, m := range matches {

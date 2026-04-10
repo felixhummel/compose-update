@@ -52,3 +52,33 @@ func TestFetchImageTags_VPrefix(t *testing.T) {
 	// v-prefix on current tag → Docker Hub web API name=v path
 	assert.Equal(t, []string{"v999.0.0"}, tags)
 }
+
+// TestFetchImageTags_DualAuthHeader tests registries that return both Bearer and
+// Basic schemes in their WWW-Authenticate header (e.g. data.forgejo.org).
+// The bug: parseBearer iterated all key=value pairs globally, so the Basic realm
+// overwrote the Bearer realm, causing token requests to go to the wrong URL.
+func TestFetchImageTags_DualAuthHeader(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/token":
+			w.Write([]byte(`{"token": "test"}`))
+		case strings.Contains(r.URL.Path, "/tags/list") && r.Header.Get("Authorization") == "Bearer test":
+			w.Write([]byte(`{"tags": ["14.0.0", "13.0.0"]}`))
+		case strings.Contains(r.URL.Path, "/tags/list"):
+			// Dual Bearer+Basic WWW-Authenticate, as returned by data.forgejo.org
+			realm := server.URL + "/v2/token"
+			w.Header().Set("WWW-Authenticate",
+				`Bearer realm="`+realm+`",service="container_registry",scope="*",Basic realm="`+server.URL+`/v2",service="container_registry",scope="*"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"errors":[{"code":"UNAUTHORIZED","message":""}]}`))
+		}
+	}))
+	defer server.Close()
+
+	registry := NewRegistryForTest(server.URL)
+	tags, err := registry.FetchImageTags("data.forgejo.org/forgejo/forgejo:14")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"14.0.0", "13.0.0"}, tags)
+}
