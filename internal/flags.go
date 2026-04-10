@@ -10,6 +10,7 @@ import (
 
 type CCUFlags struct {
 	Help      bool          // Show help message
+	DryRun    bool          // Only check for updates, do not write
 	Directory string        // Root directory to search for Docker Compose files
 	Major     bool          // Include major version updates
 	Minor     bool          // Include minor version updates
@@ -32,6 +33,7 @@ func Parse(version string) CCUFlags {
 	var patchOnly, minorOnly bool
 
 	flag.BoolVarP(&args.Help, "help", "h", false, "Show help message")
+	flag.BoolVarP(&args.DryRun, "dry-run", "n", false, "Only check for updates, do not write")
 	flag.BoolVar(&minorOnly, "minor", false, "Only update to the latest minor version")
 	flag.BoolVar(&patchOnly, "patch", false, "Only update to the latest patch version")
 	flag.BoolVarP(&args.Version, "version", "v", false, "Show version information")

@@ -1,14 +1,19 @@
 package modes
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/felixhummel/compose-update/internal"
 )
 
-func Default(updateInfos []internal.UpdateInfo) {
+func Default(updateInfos []internal.UpdateInfo, dryRun bool) {
 	for _, i := range updateInfos {
 		if !i.HasNewVersion() {
+			continue
+		}
+		if dryRun {
+			fmt.Printf("%s: %s -> %s\n", i.FilePath, i.ImageName+":"+i.CurrentTag, i.ImageName+":"+i.LatestTag)
 			continue
 		}
 		if err := i.Update(); err != nil {
