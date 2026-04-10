@@ -7,13 +7,15 @@ Fork of [Padi2312/compose-check-updates](https://github.com/Padi2312/compose-che
 ## Usage
 ```bash
 # Check current directory (all versions: major, minor, patch)
-ccu
+compose-update
 # Check a specific directory
-ccu /path/to/project
+compose-update /path/to/project
 # Patch updates only
-ccu --patch
+compose-update --patch
 # Minor updates only (includes patch)
-ccu --minor
+compose-update --minor
+# Dry-run: check without writing changes
+compose-update --dry-run
 ```
 
 All subdirectories are scanned recursively for Docker Compose files.
@@ -25,6 +27,7 @@ All subdirectories are scanned recursively for Docker Compose files.
 | ----------------- | ---------------------------------------- | --------- |
 | `--patch`         | Only suggest patch version updates       | `false`   |
 | `--minor`         | Only suggest minor+patch version updates | `false`   |
+| `-n`, `--dry-run` | Check for updates without writing        | `false`   |
 | `-m`, `--max-time`| HTTP request timeout per registry call   | `5s`      |
 | `-l`, `--log-level`| Log level (debug, info, warning, error) | `warning` |
 | `-v`, `--version` | Show version                             | `false`   |
