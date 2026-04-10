@@ -12,12 +12,12 @@ func TestParse(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
-		expected CCUFlags
+		expected Flags
 	}{
 		{
 			name: "default values",
 			args: []string{},
-			expected: CCUFlags{
+			expected: Flags{
 				Help:      false,
 				Directory: ".",
 				Major:     true,
@@ -30,7 +30,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "patch flag",
 			args: []string{"--patch"},
-			expected: CCUFlags{
+			expected: Flags{
 				Directory: ".",
 				Major:     false,
 				Minor:     false,
@@ -42,7 +42,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "minor flag",
 			args: []string{"--minor"},
-			expected: CCUFlags{
+			expected: Flags{
 				Directory: ".",
 				Major:     false,
 				Minor:     true,
@@ -54,7 +54,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "directory as positional arg",
 			args: []string{"/path/to/dir"},
-			expected: CCUFlags{
+			expected: Flags{
 				Directory: "/path/to/dir",
 				Major:     true,
 				Minor:     true,

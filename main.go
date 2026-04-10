@@ -29,13 +29,13 @@ func parseLogLevel(s string) slog.Level {
 }
 
 func main() {
-	ccuFlags := internal.Parse(version)
+	flags := internal.Parse(version)
 
-	level := parseLogLevel(ccuFlags.LogLevel)
+	level := parseLogLevel(flags.LogLevel)
 	log := slog.New(customlogger.NewCustomHandler(level, os.Stdout))
 	slog.SetDefault(log)
 
-	composeFilePaths, err := internal.GetComposeFilePaths(ccuFlags.Directory)
+	composeFilePaths, err := internal.GetComposeFilePaths(flags.Directory)
 	if err != nil {
 		slog.Error("Error getting compose file paths", "error", err)
 		os.Exit(1)
@@ -49,8 +49,8 @@ func main() {
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
-			updateChecker := internal.NewUpdateChecker(path, internal.NewRegistryWithTimeout(ccuFlags.MaxTime))
-			info, err := updateChecker.Check(ccuFlags.Major, ccuFlags.Minor, ccuFlags.Patch)
+			updateChecker := internal.NewUpdateChecker(path, internal.NewRegistryWithTimeout(flags.MaxTime))
+			info, err := updateChecker.Check(flags.Major, flags.Minor, flags.Patch)
 			if err != nil {
 				slog.Error("Error checking for updates", "error", err)
 				return
@@ -62,5 +62,5 @@ func main() {
 	}
 
 	wg.Wait()
-	modes.Default(updateInfos, ccuFlags.DryRun)
+	modes.Default(updateInfos, flags.DryRun)
 }

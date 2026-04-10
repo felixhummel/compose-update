@@ -70,7 +70,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// No backup file should be created
-	if _, err := os.Stat(tmpFile.Name() + ".ccu"); !os.IsNotExist(err) {
+	if _, err := os.Stat(tmpFile.Name() + ".compose-update"); !os.IsNotExist(err) {
 		t.Errorf("Update() should not create a backup file")
 	}
 }

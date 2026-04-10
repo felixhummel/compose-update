@@ -8,23 +8,23 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-type CCUFlags struct {
+type Flags struct {
 	Help      bool          // Show help message
 	DryRun    bool          // Only check for updates, do not write
 	Directory string        // Root directory to search for Docker Compose files
 	Major     bool          // Include major version updates
 	Minor     bool          // Include minor version updates
 	Patch     bool          // Include patch version updates
-	Version   bool          // Version of ccu
+	Version   bool          // Version of compose-update
 	LogLevel  string        // Log level (debug, info, warning, error)
 	MaxTime   time.Duration // HTTP request timeout
 }
 
-func Parse(version string) CCUFlags {
-	args := CCUFlags{}
+func Parse(version string) Flags {
+	args := Flags{}
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: ccu [flags] [directory]\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: compose-update [flags] [directory]\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n  directory\tRoot directory to scan for Docker Compose files (default: \".\")\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()

@@ -1,4 +1,4 @@
-name: Pre-release ccu
+name: Pre-release compose-update
 on:
   workflow_dispatch:
 
@@ -46,8 +46,8 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ github.workspace }}/build/ccu-${{ matrix.os }}-${{ matrix.goarch }}${{ matrix.os == 'windows' && '.exe' || '' }} main.go
-          echo "ASSET=${{ github.workspace }}/build/ccu-${{ matrix.os }}-${{ matrix.goarch }}${{ matrix.os == 'windows' && '.exe' || '' }}" >> $GITHUB_ENV
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ github.workspace }}/build/compose-update-${{ matrix.os }}-${{ matrix.goarch }}${{ matrix.os == 'windows' && '.exe' || '' }} main.go
+          echo "ASSET=${{ github.workspace }}/build/compose-update-${{ matrix.os }}-${{ matrix.goarch }}${{ matrix.os == 'windows' && '.exe' || '' }}" >> $GITHUB_ENV
 
       - name: Tag commit
         run: |

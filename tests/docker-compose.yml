@@ -1,11 +1,11 @@
 version: "3.8"
 
 services:
-  # # Shouldn't be recognized by ccu because of invalid semver
+  # # Shouldn't be recognized by compose-update because of invalid semver
   # nginx-latest:
   #   image: nginx:latest
 
-  # # Shouldn't be recognized by ccu because of invalid semver
+  # # Shouldn't be recognized by compose-update because of invalid semver
   # pytorch-latest:
   #   image: pytorch/pytorch:latest
 
