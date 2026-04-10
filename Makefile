@@ -9,4 +9,4 @@ install-dev:
 	ln -s $$PWD/compose-update  ~/.local/bin/compose-update
 
 real-world:
-	compose-update -ldebug ~/hukudo/moni/prom
+	./compose-update -ldebug ~/hukudo/moni/prom

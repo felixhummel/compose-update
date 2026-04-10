@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -20,6 +21,13 @@ type CCUFlags struct {
 
 func Parse(version string) CCUFlags {
 	args := CCUFlags{}
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: ccu [flags] [directory]\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n  directory\tRoot directory to scan for Docker Compose files (default: \".\")\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.PrintDefaults()
+	}
 
 	var patchOnly, minorOnly bool
 
