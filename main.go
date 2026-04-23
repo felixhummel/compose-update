@@ -11,7 +11,7 @@ import (
 	"github.com/felixhummel/compose-update/internal/modes"
 )
 
-var version = "0.2.2"
+var version = "0.3.0"
 
 func parseLogLevel(s string) slog.Level {
 	switch strings.ToLower(s) {
