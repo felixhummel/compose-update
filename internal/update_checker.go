@@ -42,7 +42,7 @@ func (u *UpdateChecker) Check(major, minor, patch bool) ([]UpdateInfo, error) {
 		wg.Add(1)
 		go func(i int, updateInfo UpdateInfo, version *semver.Version) {
 			defer wg.Done()
-			slog.Info("Checking image", "image", updateInfo.FullImageName)
+			slog.Debug("Checking image", "image", updateInfo.FullImageName)
 			tags, err := u.registry.FetchImageTags(updateInfo.FullImageName)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Skipping (failed fetching tags) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
@@ -51,7 +51,10 @@ func (u *UpdateChecker) Check(major, minor, patch bool) ([]UpdateInfo, error) {
 
 			latestVersion := FindLatestVersion(version, tags, major, minor, patch)
 			if latestVersion != "" {
+				slog.Info("update/available", "image", updateInfo.FullImageName, "latest", latestVersion)
 				updateInfos[i].LatestTag = latestVersion
+			} else {
+				slog.Info("update/current", "image", updateInfo.FullImageName)
 			}
 		}(i, updateInfo, version)
 	}
