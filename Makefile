@@ -13,3 +13,21 @@ e2e:
 
 real-world:
 	./compose-update -ldebug ~/hukudo/moni/prom
+
+pre-release: default
+
+push-with-tags:
+	git push
+	git push --tags
+
+major-release: pre-release
+	bump-my-version bump major
+	make push-with-tags
+
+minor-release: pre-release
+	bump-my-version bump minor
+	make push-with-tags
+
+patch-release: pre-release
+	bump-my-version bump patch
+	make push-with-tags
