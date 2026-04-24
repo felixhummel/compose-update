@@ -74,6 +74,30 @@ func FindLatestVersion(current *semver.Version, tags []string, major, minor, pat
 	return ""
 }
 
+// SortTagsBySemver returns the subset of tags that are valid semver, sorted descending.
+func SortTagsBySemver(tags []string) []string {
+	type vt struct {
+		v   *semver.Version
+		tag string
+	}
+	var parsed []vt
+	for _, tag := range tags {
+		v, err := semver.NewVersion(tag)
+		if err != nil {
+			continue
+		}
+		parsed = append(parsed, vt{v, tag})
+	}
+	sort.Slice(parsed, func(i, j int) bool {
+		return parsed[i].v.GreaterThan(parsed[j].v)
+	})
+	result := make([]string, len(parsed))
+	for i, p := range parsed {
+		result[i] = p.tag
+	}
+	return result
+}
+
 func isValidSemver(tag string) bool {
 	tag = strings.TrimPrefix(tag, "v")
 	regex := regexp.MustCompile(`^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)

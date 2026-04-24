@@ -42,7 +42,7 @@ func main() {
 			slog.Error("Error fetching tags", "error", err)
 			os.Exit(1)
 		}
-		for _, t := range tags {
+		for _, t := range internal.SortTagsBySemver(tags) {
 			fmt.Println(t)
 		}
 		return
