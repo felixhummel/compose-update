@@ -139,6 +139,84 @@ func (r *Registry) FetchImageTags(image string) ([]string, error) {
 	return r.fetchTagsOCI(ctx, baseURL, repo, token)
 }
 
+// FetchAllImageTags returns every tag for an image without any semver filtering.
+// Useful for exploration and debugging.
+func (r *Registry) FetchAllImageTags(image string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
+	defer cancel()
+
+	registry, repo := parseImageRef(image)
+	baseURL := "https://" + registry
+
+	if isDockerHub(registry) {
+		return r.fetchDockerHubAllTags(ctx, repo)
+	}
+
+	token, err := r.fetchToken(ctx, baseURL, registry, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	var tags []string
+	url := fmt.Sprintf("%s/v2/%s/tags/list?n=100", baseURL, repo)
+	for url != "" {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, _, err := do(r.client, req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+			return nil, fmt.Errorf("registry returned %d fetching tags", resp.StatusCode)
+		}
+		var result struct {
+			Tags []string `json:"tags"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		tags = append(tags, result.Tags...)
+		url = parseLinkNext(resp.Header.Get("Link"), baseURL)
+	}
+	return tags, nil
+}
+
+func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]string, error) {
+	var tags []string
+	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=100&ordering=-last_updated", repo)
+	for url != "" {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, _, err := do(r.client, req)
+		if err != nil {
+			return nil, err
+		}
+		var result struct {
+			Results []struct {
+				Name string `json:"name"`
+			} `json:"results"`
+			Next string `json:"next"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		for _, t := range result.Results {
+			tags = append(tags, t.Name)
+		}
+		url = result.Next
+	}
+	return tags, nil
+}
+
 // fetchDockerHubVPrefix fetches tags from the Docker Hub web API filtered to name=v,
 // ordered by last_updated descending. Returns all pages that contain semver tags.
 func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]string, error) {

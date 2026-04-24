@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -34,6 +35,18 @@ func main() {
 	level := parseLogLevel(flags.LogLevel)
 	log := slog.New(customlogger.NewCustomHandler(level, os.Stdout))
 	slog.SetDefault(log)
+
+	if flags.Tags != "" {
+		tags, err := internal.NewRegistryWithTimeout(flags.MaxTime).FetchAllImageTags(flags.Tags)
+		if err != nil {
+			slog.Error("Error fetching tags", "error", err)
+			os.Exit(1)
+		}
+		for _, t := range tags {
+			fmt.Println(t)
+		}
+		return
+	}
 
 	var updateInfos []internal.UpdateInfo
 

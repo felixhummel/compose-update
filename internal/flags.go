@@ -13,6 +13,7 @@ type Flags struct {
 	DryRun    bool          // Only check for updates, do not write
 	Directory string        // Root directory to search for Docker Compose files
 	Image     string        // Single image to check (e.g. nginx:1.25.0)
+	Tags      string        // Print all tags for an image (e.g. postgres:14.5)
 	Version   bool          // Version of compose-update
 	LogLevel  string        // Log level (debug, info, warning, error)
 	MaxTime   time.Duration // HTTP request timeout
@@ -31,6 +32,7 @@ func Parse(version string) Flags {
 	flag.BoolVarP(&args.Help, "help", "h", false, "Show help message")
 	flag.BoolVarP(&args.DryRun, "dry-run", "n", false, "Only check for updates, do not write")
 	flag.StringVar(&args.Image, "image", "", "Check a single image (e.g. nginx:1.25.0)")
+	flag.StringVar(&args.Tags, "tags", "", "Print all tags for an image (e.g. postgres:14.5)")
 	flag.BoolVarP(&args.Version, "version", "v", false, "Show version information")
 	flag.StringVarP(&args.LogLevel, "log-level", "l", "warning", "Log level (debug, info, warning, error)")
 	flag.DurationVarP(&args.MaxTime, "max-time", "m", 5*time.Second, "HTTP request timeout per registry call")
