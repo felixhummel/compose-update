@@ -20,33 +20,6 @@ func TestParse(t *testing.T) {
 			expected: Flags{
 				Help:      false,
 				Directory: ".",
-				Major:     true,
-				Minor:     true,
-				Patch:     true,
-				LogLevel:  "warning",
-				MaxTime:   5 * time.Second,
-			},
-		},
-		{
-			name: "patch flag",
-			args: []string{"--patch"},
-			expected: Flags{
-				Directory: ".",
-				Major:     false,
-				Minor:     false,
-				Patch:     true,
-				LogLevel:  "warning",
-				MaxTime:   5 * time.Second,
-			},
-		},
-		{
-			name: "minor flag",
-			args: []string{"--minor"},
-			expected: Flags{
-				Directory: ".",
-				Major:     false,
-				Minor:     true,
-				Patch:     true,
 				LogLevel:  "warning",
 				MaxTime:   5 * time.Second,
 			},
@@ -56,9 +29,6 @@ func TestParse(t *testing.T) {
 			args: []string{"/path/to/dir"},
 			expected: Flags{
 				Directory: "/path/to/dir",
-				Major:     true,
-				Minor:     true,
-				Patch:     true,
 				LogLevel:  "warning",
 				MaxTime:   5 * time.Second,
 			},
