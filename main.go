@@ -51,7 +51,7 @@ func main() {
 	var updateInfos []internal.UpdateInfo
 
 	if flags.Image != "" {
-		infos, err := internal.CheckImage(flags.Image, internal.NewRegistryWithTimeout(flags.MaxTime))
+		infos, err := internal.CheckImage(flags.Image, internal.NewRegistryWithTimeout(flags.MaxTime), flags.Major, flags.Minor, flags.Patch)
 		if err != nil {
 			slog.Error("Error checking image", "error", err)
 			os.Exit(1)
@@ -72,7 +72,7 @@ func main() {
 			go func(path string) {
 				defer wg.Done()
 				updateChecker := internal.NewUpdateChecker(path, internal.NewRegistryWithTimeout(flags.MaxTime))
-				info, err := updateChecker.Check()
+				info, err := updateChecker.Check(flags.Major, flags.Minor, flags.Patch)
 				if err != nil {
 					slog.Error("Error checking for updates", "error", err)
 					return

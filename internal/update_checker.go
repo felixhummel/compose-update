@@ -25,7 +25,7 @@ func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
 	return &UpdateChecker{path: path, registry: registry}
 }
 
-func (u *UpdateChecker) Check() ([]UpdateInfo, error) {
+func (u *UpdateChecker) Check(major, minor, patch bool) ([]UpdateInfo, error) {
 	updateInfos, err := u.createUpdateInfos()
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (u *UpdateChecker) Check() ([]UpdateInfo, error) {
 				return
 			}
 
-			latestVersion := FindLatestVersion(version, tags, true, true, true)
+			latestVersion := FindLatestVersion(version, tags, major, minor, patch)
 			if latestVersion != "" {
 				slog.Info("update/available", "image", updateInfo.FullImageName, "latest", latestVersion)
 				updateInfos[i].LatestTag = latestVersion

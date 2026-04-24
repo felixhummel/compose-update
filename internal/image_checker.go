@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-func CheckImage(image string, registry *Registry) ([]UpdateInfo, error) {
+func CheckImage(image string, registry *Registry, major, minor, patch bool) ([]UpdateInfo, error) {
 	parts := strings.SplitN(image, ":", 2)
 	if len(parts) != 2 || parts[1] == "" {
 		return nil, fmt.Errorf("image must be in name:tag format, got %q", image)
@@ -32,7 +32,7 @@ func CheckImage(image string, registry *Registry) ([]UpdateInfo, error) {
 		return nil, fmt.Errorf("failed fetching tags for %s: %w", name, err)
 	}
 
-	latestVersion := FindLatestVersion(current, tags, true, true, true)
+	latestVersion := FindLatestVersion(current, tags, major, minor, patch)
 	if latestVersion != "" {
 		slog.Info("update/available", "image", image, "latest", latestVersion)
 		info.LatestTag = latestVersion
