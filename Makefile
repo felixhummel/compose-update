@@ -16,7 +16,10 @@ real-world:
 
 pre-release: default
 
-push-with-tags:
+jj-update-main:
+	jj bookmark set main -r @-
+
+push-with-tags: jj-update-main
 	git push
 	git push --tags
 
