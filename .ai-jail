@@ -3,8 +3,7 @@
 # Edit freely. Regenerate with: ai-jail --clean --init
 
 command = [
-    "claude",
-    "--dangerously-skip-permissions",
+    "pi",
     "-c",
 ]
 rw_maps = [

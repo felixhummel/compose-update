@@ -223,7 +223,7 @@ services:
 			registry := NewRegistryForTest(server.URL)
 			updateChecker := NewUpdateChecker(file.Name(), registry)
 
-			result, err := updateChecker.Check(true, true, true)
+			result, err := updateChecker.Check(MajorLevel)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -252,7 +252,7 @@ func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
 	registry := NewRegistryForTest(server.URL)
 	updateChecker := NewUpdateChecker("../tests/build-arg-img/docker-compose.yml", registry)
 
-	result, err := updateChecker.Check(true, true, true)
+	result, err := updateChecker.Check(MajorLevel)
 	assert.NoError(t, err)
 
 	byImage := make(map[string]UpdateInfo)

@@ -15,6 +15,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
+const pageSize = 1000
+
 type IRegistry interface {
 	FetchImageTags(image string) ([]string, error)
 }
@@ -102,21 +104,20 @@ func (r *Registry) FetchImageTags(image string) ([]string, error) {
 	registry, repo := parseImageRef(image)
 	baseURL := "https://" + registry
 
-	// For Docker Hub: use the 'latest' tag digest to find the pinnable semver tag,
-	// analogous to the ghcr.io GitHub releases approach.
+	// For Docker Hub: fetch all tags (latest-digest approach is unreliable for finding all versions)
 	if isDockerHub(registry) {
-		tags, err := r.fetchDockerHubLatestTags(ctx, repo)
-		if err == nil && len(tags) > 0 {
-			slog.Debug("Using latest-digest tags from Docker Hub", "repo", repo, "tags", tags)
-			return tags, nil
+		// For v-prefixed images (e.g., prometheus:v1.0.0), use dedicated API
+		if strings.HasPrefix(currentTag, "v") {
+			tags, err := r.fetchDockerHubVPrefix(ctx, repo)
+			if err == nil && hasSemver(tags) {
+				slog.Debug("Using v-prefix tags from Docker Hub web API", "repo", repo, "count", len(tags))
+				return tags, nil
+			}
 		}
-	}
-
-	// For Docker Hub with a v-prefixed current tag: try the web API name=v filter as fallback.
-	if isDockerHub(registry) && strings.HasPrefix(currentTag, "v") {
-		tags, err := r.fetchDockerHubVPrefix(ctx, repo)
-		if err == nil && hasSemver(tags) {
-			slog.Debug("Using v-prefix tags from Docker Hub web API", "repo", repo, "count", len(tags))
+		// Use all Docker Hub tags (handles all version schemes reliably)
+		tags, err := r.fetchDockerHubAllTags(ctx, repo)
+		if err == nil && len(tags) > 0 {
+			slog.Debug("Using all Docker Hub tags", "repo", repo, "count", len(tags))
 			return tags, nil
 		}
 	}
@@ -158,7 +159,7 @@ func (r *Registry) FetchAllImageTags(image string) ([]string, error) {
 	}
 
 	var tags []string
-	url := fmt.Sprintf("%s/v2/%s/tags/list?n=100", baseURL, repo)
+	url := fmt.Sprintf("%s/v2/%s/tags/list?n=%d", baseURL, repo, pageSize)
 	for url != "" {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -190,8 +191,10 @@ func (r *Registry) FetchAllImageTags(image string) ([]string, error) {
 
 func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]string, error) {
 	var tags []string
-	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=100&ordering=-last_updated", repo)
-	for url != "" {
+	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=-last_updated", repo, pageSize)
+	maxPages := 50 // Limit pages to avoid timeouts; covers ~50k tags
+	for url != "" && maxPages > 0 {
+		maxPages--
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, err
@@ -212,7 +215,7 @@ func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]st
 		for _, t := range result.Results {
 			tags = append(tags, t.Name)
 		}
-		url = result.Next
+		url = withPageSize(result.Next)
 	}
 	return tags, nil
 }
@@ -221,7 +224,7 @@ func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]st
 // ordered by last_updated descending. Returns all pages that contain semver tags.
 func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]string, error) {
 	var tags []string
-	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?name=v&page_size=100&ordering=-last_updated", repo)
+	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?name=v&page_size=%d&ordering=-last_updated", repo, pageSize)
 
 	for url != "" {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -253,7 +256,7 @@ func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]st
 		if !hasSemver(page) {
 			break
 		}
-		url = result.Next
+		url = withPageSize(result.Next)
 	}
 
 	return tags, nil
@@ -291,7 +294,7 @@ func (r *Registry) fetchDockerHubLatestTags(ctx context.Context, repo string) ([
 	}
 
 	// Scan recent tags (ordered by last_updated) for semver tags sharing the same digest.
-	tagsURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=100&ordering=-last_updated", repo)
+	tagsURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=-last_updated", repo, pageSize)
 	var tags []string
 
 	for tagsURL != "" {
@@ -326,7 +329,7 @@ func (r *Registry) fetchDockerHubLatestTags(ctx context.Context, repo string) ([
 		if len(tags) > 0 {
 			break
 		}
-		tagsURL = result.Next
+		tagsURL = withPageSize(result.Next)
 	}
 
 	if len(tags) == 0 {
@@ -464,7 +467,7 @@ func parseBearer(wwwAuth string) (realm, queryParams string, err error) {
 // contains no semver tags (we've left the semver range) or the context deadline fires.
 func (r *Registry) fetchTagsOCI(ctx context.Context, baseURL, repo, token string) ([]string, error) {
 	var tags []string
-	url := fmt.Sprintf("%s/v2/%s/tags/list?n=100", baseURL, repo)
+	url := fmt.Sprintf("%s/v2/%s/tags/list?n=%d", baseURL, repo, pageSize)
 
 	for url != "" {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -523,7 +526,7 @@ func do(client *http.Client, req *http.Request) (*http.Response, time.Duration, 
 	start := time.Now()
 	resp, err := client.Do(req)
 	elapsed := time.Since(start)
-	slog.Debug("GET", "url", req.URL, "elapsed", elapsed, "status", statusCode(resp), "err", err)
+	slog.Debug("GET", "url", req.URL, "elapsed", elapsed, "status", statusCode(resp), "kB", responseKB(resp), "err", err)
 	return resp, elapsed, err
 }
 
@@ -532,6 +535,28 @@ func statusCode(resp *http.Response) int {
 		return 0
 	}
 	return resp.StatusCode
+}
+
+func responseKB(resp *http.Response) string {
+	if resp == nil || resp.ContentLength < 0 {
+		return "?"
+	}
+	return fmt.Sprintf("%.1f", float64(resp.ContentLength)/1024)
+}
+
+// withPageSize overwrites the page_size query parameter in a Docker Hub next URL.
+func withPageSize(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	q := u.Query()
+	q.Set("page_size", fmt.Sprintf("%d", pageSize))
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // parseLinkNext parses the Link header for the next page URL.
