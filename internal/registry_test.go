@@ -84,6 +84,33 @@ func TestFetchImageTags_DualAuthHeader(t *testing.T) {
 	assert.Equal(t, []string{"14.0.0", "13.0.0"}, tags)
 }
 
+func TestFetchImageTags_DockerHubLatestDigest(t *testing.T) {
+	const latestDigest = "sha256:cafebabe"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/tags/latest"):
+			w.Write([]byte(`{"digest":"` + latestDigest + `"}`))
+		case strings.Contains(r.URL.Path, "/tags") && strings.Contains(r.URL.RawQuery, "ordering=-last_updated"):
+			w.Write([]byte(`{"results":[` +
+				`{"name":"latest","digest":"` + latestDigest + `"},` +
+				`{"name":"1.25.3","digest":"` + latestDigest + `"},` +
+				`{"name":"1.25","digest":"` + latestDigest + `"},` +
+				`{"name":"1.24.0","digest":"sha256:deadbeef"}` +
+				`],"next":null}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	registry := NewRegistryForTest(server.URL)
+	tags, err := registry.FetchImageTags("library/nginx:1.24.0")
+
+	assert.NoError(t, err)
+	// Only the semver tag matching the latest digest is returned (not "latest" or "1.25").
+	assert.Equal(t, []string{"1.25.3"}, tags)
+}
+
 func TestFetchImageTags_GitHubReleases(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// GitHub releases API endpoint

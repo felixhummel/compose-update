@@ -102,8 +102,17 @@ func (r *Registry) FetchImageTags(image string) ([]string, error) {
 	registry, repo := parseImageRef(image)
 	baseURL := "https://" + registry
 
-	// For Docker Hub with a v-prefixed current tag: try the web API name=v filter first
-	// (fetches only v-prefixed tags, ordered by last_updated — usually 1-2 pages)
+	// For Docker Hub: use the 'latest' tag digest to find the pinnable semver tag,
+	// analogous to the ghcr.io GitHub releases approach.
+	if isDockerHub(registry) {
+		tags, err := r.fetchDockerHubLatestTags(ctx, repo)
+		if err == nil && len(tags) > 0 {
+			slog.Debug("Using latest-digest tags from Docker Hub", "repo", repo, "tags", tags)
+			return tags, nil
+		}
+	}
+
+	// For Docker Hub with a v-prefixed current tag: try the web API name=v filter as fallback.
 	if isDockerHub(registry) && strings.HasPrefix(currentTag, "v") {
 		tags, err := r.fetchDockerHubVPrefix(ctx, repo)
 		if err == nil && hasSemver(tags) {
@@ -169,6 +178,82 @@ func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]st
 		url = result.Next
 	}
 
+	return tags, nil
+}
+
+// fetchDockerHubLatestTags resolves the digest of the 'latest' tag on Docker Hub and
+// returns the semver tags that share that digest — analogous to fetchGitHubReleasesTags
+// for ghcr.io images.
+func (r *Registry) fetchDockerHubLatestTags(ctx context.Context, repo string) ([]string, error) {
+	// Fetch digest of the 'latest' tag via the Docker Hub web API.
+	latestURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags/latest", repo)
+	req, err := http.NewRequestWithContext(ctx, "GET", latestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, _, err := do(r.client, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("Docker Hub returned %d for latest tag of %s", resp.StatusCode, repo)
+	}
+
+	var latestInfo struct {
+		Digest string `json:"digest"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&latestInfo); err != nil {
+		return nil, err
+	}
+	if latestInfo.Digest == "" {
+		return nil, fmt.Errorf("no digest for latest tag of %s", repo)
+	}
+
+	// Scan recent tags (ordered by last_updated) for semver tags sharing the same digest.
+	tagsURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=100&ordering=-last_updated", repo)
+	var tags []string
+
+	for tagsURL != "" {
+		req, err := http.NewRequestWithContext(ctx, "GET", tagsURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, _, err := do(r.client, req)
+		if err != nil {
+			return nil, err
+		}
+
+		var result struct {
+			Results []struct {
+				Name   string `json:"name"`
+				Digest string `json:"digest"`
+			} `json:"results"`
+			Next string `json:"next"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		for _, t := range result.Results {
+			if t.Digest == latestInfo.Digest && isValidSemver(t.Name) {
+				tags = append(tags, t.Name)
+			}
+		}
+
+		// The matching semver tags are published alongside 'latest' — they appear
+		// at the top of the recency-sorted list. Stop once we've passed them.
+		if len(tags) > 0 {
+			break
+		}
+		tagsURL = result.Next
+	}
+
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("no semver tags found matching latest digest for %s", repo)
+	}
 	return tags, nil
 }
 

@@ -50,5 +50,10 @@ make install-dev  # symlinks binary to ~/.local/bin/compose-update
 
 
 ## How it works
-`compose-update` scans for Docker Compose files, reads each service's image tag, and queries the container registry for newer versions matching the requested semver range.
-Image tags are updated in-place.
+`compose-update` scans for Docker Compose files, reads each service's image tag, and queries the container registry for newer semver versions. Image tags are updated in-place.
+
+**Docker Hub** (`docker.io`): resolves the `latest` tag's manifest digest, then finds the semver tags sharing that digest — the same approach Docker itself uses to publish a versioned release alongside `latest`. Falls back to filtering by `v`-prefix or full tag enumeration if no digest match is found.
+
+**GitHub Container Registry** (`ghcr.io`): calls the GitHub Releases API (`/releases/latest`) to get the current release tag directly, avoiding tag-list pagination entirely.
+
+**Other registries**: paginates the OCI `tags/list` endpoint, stopping early once pages no longer contain semver tags.
