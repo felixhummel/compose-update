@@ -12,8 +12,12 @@ func Default(updateInfos []internal.UpdateInfo, dryRun bool) {
 		if !i.HasNewVersion() {
 			continue
 		}
-		if dryRun {
-			fmt.Printf("%s: %s -> %s\n", i.FilePath, i.ImageName+":"+i.CurrentTag, i.ImageName+":"+i.LatestTag)
+		if dryRun || i.FilePath == "" {
+			if i.FilePath != "" {
+				fmt.Printf("%s: %s -> %s\n", i.FilePath, i.ImageName+":"+i.CurrentTag, i.ImageName+":"+i.LatestTag)
+			} else {
+				fmt.Printf("%s:%s\n", i.ImageName, i.LatestTag)
+			}
 			continue
 		}
 		if err := i.Update(); err != nil {

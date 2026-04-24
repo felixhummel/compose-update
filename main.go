@@ -35,32 +35,43 @@ func main() {
 	log := slog.New(customlogger.NewCustomHandler(level, os.Stdout))
 	slog.SetDefault(log)
 
-	composeFilePaths, err := internal.GetComposeFilePaths(flags.Directory)
-	if err != nil {
-		slog.Error("Error getting compose file paths", "error", err)
-		os.Exit(1)
-	}
-
 	var updateInfos []internal.UpdateInfo
-	var mu sync.Mutex
-	var wg sync.WaitGroup
 
-	for _, path := range composeFilePaths {
-		wg.Add(1)
-		go func(path string) {
-			defer wg.Done()
-			updateChecker := internal.NewUpdateChecker(path, internal.NewRegistryWithTimeout(flags.MaxTime))
-			info, err := updateChecker.Check(flags.Major, flags.Minor, flags.Patch)
-			if err != nil {
-				slog.Error("Error checking for updates", "error", err)
-				return
-			}
-			mu.Lock()
-			updateInfos = append(updateInfos, info...)
-			mu.Unlock()
-		}(path)
+	if flags.Image != "" {
+		infos, err := internal.CheckImage(flags.Image, internal.NewRegistryWithTimeout(flags.MaxTime), flags.Major, flags.Minor, flags.Patch)
+		if err != nil {
+			slog.Error("Error checking image", "error", err)
+			os.Exit(1)
+		}
+		updateInfos = infos
+	} else {
+		composeFilePaths, err := internal.GetComposeFilePaths(flags.Directory)
+		if err != nil {
+			slog.Error("Error getting compose file paths", "error", err)
+			os.Exit(1)
+		}
+
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+
+		for _, path := range composeFilePaths {
+			wg.Add(1)
+			go func(path string) {
+				defer wg.Done()
+				updateChecker := internal.NewUpdateChecker(path, internal.NewRegistryWithTimeout(flags.MaxTime))
+				info, err := updateChecker.Check(flags.Major, flags.Minor, flags.Patch)
+				if err != nil {
+					slog.Error("Error checking for updates", "error", err)
+					return
+				}
+				mu.Lock()
+				updateInfos = append(updateInfos, info...)
+				mu.Unlock()
+			}(path)
+		}
+
+		wg.Wait()
 	}
 
-	wg.Wait()
 	modes.Default(updateInfos, flags.DryRun)
 }

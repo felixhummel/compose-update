@@ -12,6 +12,7 @@ type Flags struct {
 	Help      bool          // Show help message
 	DryRun    bool          // Only check for updates, do not write
 	Directory string        // Root directory to search for Docker Compose files
+	Image     string        // Single image to check (e.g. nginx:1.25.0)
 	Major     bool          // Include major version updates
 	Minor     bool          // Include minor version updates
 	Patch     bool          // Include patch version updates
@@ -34,6 +35,7 @@ func Parse(version string) Flags {
 
 	flag.BoolVarP(&args.Help, "help", "h", false, "Show help message")
 	flag.BoolVarP(&args.DryRun, "dry-run", "n", false, "Only check for updates, do not write")
+	flag.StringVar(&args.Image, "image", "", "Check a single image (e.g. nginx:1.25.0)")
 	flag.BoolVar(&minorOnly, "minor", false, "Only update to the latest minor version")
 	flag.BoolVar(&patchOnly, "patch", false, "Only update to the latest patch version")
 	flag.BoolVarP(&args.Version, "version", "v", false, "Show version information")
