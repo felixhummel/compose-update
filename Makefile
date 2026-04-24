@@ -16,10 +16,12 @@ real-world:
 
 pre-release: default
 
-jj-update-main:
+# mixing jj and git is fun
+update-main:
 	jj bookmark set main -r @-
+	git checkout main
 
-push-with-tags: jj-update-main
+push-with-tags: update-main
 	git push
 	git push --tags
 
