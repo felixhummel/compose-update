@@ -33,7 +33,7 @@ func main() {
 	flags := internal.Parse(version)
 
 	level := parseLogLevel(flags.LogLevel)
-	log := slog.New(customlogger.NewCustomHandler(level, os.Stdout))
+	log := slog.New(customlogger.NewCustomHandler(level, os.Stderr))
 	slog.SetDefault(log)
 
 	if flags.Tags != "" {
