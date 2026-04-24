@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(go test:*)",
+      "Bash(jj d:*)",
+      "Bash(go get:*)",
+      "Bash(go:*)",
+      "Bash(make:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(xxd)",
+      "Bash"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "/home/felix/hacks/compose-update",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/felix/hacks/compose-update && make"
+          }
+        ]
+      }
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  }
+}

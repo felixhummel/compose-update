@@ -76,9 +76,28 @@ func TestFetchImageTags_DualAuthHeader(t *testing.T) {
 	}))
 	defer server.Close()
 
+
 	registry := NewRegistryForTest(server.URL)
 	tags, err := registry.FetchImageTags("data.forgejo.org/forgejo/forgejo:14")
 
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"14.0.0", "13.0.0"}, tags)
+}
+
+func TestFetchImageTags_GitHubReleases(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// GitHub releases API endpoint
+		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+			w.Write([]byte(`{"tag_name": "v2.0.0"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	registry := NewRegistryForTest(server.URL)
+	tags, err := registry.FetchImageTags("ghcr.io/owner/repo:v1.0.0")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"v2.0.0"}, tags)
 }

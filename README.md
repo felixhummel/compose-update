@@ -1,7 +1,5 @@
 # compose-update
-Check Docker Compose image tags for newer versions — like `npm-check-updates` for `package.json`.
-
-Fork of [Padi2312/compose-check-updates](https://github.com/Padi2312/compose-check-updates).
+Checks Docker Compose images for newer versions.
 
 
 ## Usage

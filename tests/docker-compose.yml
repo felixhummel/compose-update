@@ -19,9 +19,12 @@ services:
     image: postgres:14.5
 
   alpine:
-    image: alpine:3.16
+    image: alpine:3.23.4
 
   # pytorch:
   #   image: pytorch/pytorch:1.8.1-cuda11.1-cudnn8-runtime
   forgejo:
-    image: data.forgejo.org/forgejo/forgejo:14
+    image: data.forgejo.org/forgejo/forgejo:15.0.0
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.9.2

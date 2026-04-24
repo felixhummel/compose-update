@@ -76,6 +76,10 @@ func isDockerHub(registry string) bool {
 	return registry == "registry-1.docker.io" || registry == "docker.io"
 }
 
+func isGHCR(registry string) bool {
+	return registry == "ghcr.io"
+}
+
 func hasSemver(tags []string) bool {
 	for _, tag := range tags {
 		if _, err := semver.NewVersion(tag); err == nil {
@@ -106,6 +110,16 @@ func (r *Registry) FetchImageTags(image string) ([]string, error) {
 			slog.Debug("Using v-prefix tags from Docker Hub web API", "repo", repo, "count", len(tags))
 			return tags, nil
 		}
+	}
+
+	// For ghcr.io images: use GitHub API to get releases
+	if isGHCR(registry) {
+		tags, err := r.fetchGitHubReleasesTags(ctx, repo)
+		if err == nil && len(tags) > 0 {
+			slog.Debug("Using GitHub releases API", "repo", repo, "tags", tags)
+			return tags, nil
+		}
+		return nil, err
 	}
 
 	// Fall back to OCI API with early stop when pages contain no semver tags
@@ -156,6 +170,44 @@ func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]st
 	}
 
 	return tags, nil
+}
+
+// fetchGitHubReleasesTags fetches all release tags from the GitHub API for a ghcr.io image.
+// It returns tags from all releases (not just the latest) to enable comparison with current tag.
+func (r *Registry) fetchGitHubReleasesTags(ctx context.Context, repo string) ([]string, error) {
+	// First try to get the latest release
+	latestURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	req, err := http.NewRequestWithContext(ctx, "GET", latestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, _, err := do(r.client, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("GitHub API returned %d for %s", resp.StatusCode, repo)
+	}
+
+	var latestRelease struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&latestRelease); err != nil {
+		return nil, err
+	}
+
+	// For ghcr.io images, we only return the latest release tag
+	// as that's the primary use case for checking if updates are available
+	if latestRelease.TagName == "" {
+		return nil, fmt.Errorf("no release tag found for %s", repo)
+	}
+
+	return []string{latestRelease.TagName}, nil
 }
 
 // fetchToken gets a bearer token for the given registry and repository.
