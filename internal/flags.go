@@ -70,15 +70,29 @@ func Parse(version string) Flags {
 		os.Exit(0)
 	}
 
+	// Read config file and apply defaults
+	cfg := ReadConfig()
+
 	if flag.NArg() > 0 {
 		args.Directory = flag.Arg(0)
-	} else {
-		args.Directory = "."
+	} else if args.Directory == "" {
+		args.Directory = cfg.Directory
 	}
 
-	if patch {
+	// Apply config for other flags if not set via flag
+	if args.LogLevel == "" || args.LogLevel == "warning" {
+		args.LogLevel = cfg.LogLevel
+	}
+	if args.MaxTime == 5*time.Second {
+		args.MaxTime = cfg.MaxTime
+	}
+	if !args.DryRun {
+		args.DryRun = cfg.DryRun
+	}
+
+	if patch || cfg.Patch {
 		args.UpdateLevel = PatchLevel
-	} else if minor {
+	} else if minor || cfg.Minor {
 		args.UpdateLevel = MinorLevel
 	} else {
 		args.UpdateLevel = MajorLevel
