@@ -14,6 +14,8 @@ compose-update --patch
 compose-update --minor
 # Dry-run: check without writing changes
 compose-update --dry-run
+# skip images
+compose-update --exclude "postgres:*"
 ```
 
 All subdirectories are scanned recursively for Docker Compose files.
@@ -37,6 +39,8 @@ Without `--patch` or `--minor`, all updates (major, minor, patch) are shown.
 ## Installation
 ```bash
 go install github.com/felixhummel/compose-update@latest
+# or
+mise use -g github:felixhummel/compose-update
 ```
 
 Or build from source:

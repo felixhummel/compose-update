@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 type UpdateChecker struct {
 	path     string
 	registry *Registry
+	exclude  []string
 }
 
 func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
@@ -23,6 +25,37 @@ func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
 		registry = NewRegistryWithTimeout(5 * time.Second)
 	}
 	return &UpdateChecker{path: path, registry: registry}
+}
+
+func NewUpdateCheckerWithExclude(path string, registry *Registry, exclude []string) *UpdateChecker {
+	checker := NewUpdateChecker(path, registry)
+	checker.exclude = exclude
+	return checker
+}
+
+func matchesGlob(image, pattern string) bool {
+	// Use filepath.Match for glob matching (supports *, ?, [...])
+	// Match both full image name and just the image name (without tag)
+	if matched, _ := filepath.Match(pattern, image); matched {
+		return true
+	}
+	// Also match without tag
+	parts := strings.SplitN(image, ":", 2)
+	if len(parts) > 0 {
+		if matched, _ := filepath.Match(pattern, parts[0]); matched {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *UpdateChecker) isExcluded(image string) bool {
+	for _, pattern := range u.exclude {
+		if matchesGlob(image, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func (u *UpdateChecker) Check(level UpdateLevel) ([]UpdateInfo, error) {
@@ -33,6 +66,11 @@ func (u *UpdateChecker) Check(level UpdateLevel) ([]UpdateInfo, error) {
 
 	var wg sync.WaitGroup
 	for i, updateInfo := range updateInfos {
+		if u.isExcluded(updateInfo.FullImageName) {
+			slog.Warn("excluding", "image", updateInfo.FullImageName)
+			continue
+		}
+
 		version, err := semver.NewVersion(updateInfo.CurrentTag)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("Skipping (invalid semver) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
