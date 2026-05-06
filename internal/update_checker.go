@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bufio"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -73,7 +72,7 @@ func (u *UpdateChecker) Check(level UpdateLevel) ([]UpdateInfo, error) {
 
 		version, err := semver.NewVersion(updateInfo.CurrentTag)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Skipping (invalid semver) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
+			slog.Warn("skip", "image", updateInfo.ImageName, "path", updateInfo.FilePath, "reason", "invalid semver")
 			continue
 		}
 
@@ -83,7 +82,7 @@ func (u *UpdateChecker) Check(level UpdateLevel) ([]UpdateInfo, error) {
 			slog.Debug("Checking image", "image", updateInfo.FullImageName)
 			tags, err := u.registry.FetchImageTags(updateInfo.FullImageName)
 			if err != nil {
-				slog.Error(fmt.Sprintf("Skipping (failed fetching tags) \t Image: %s \t Path: %s", updateInfo.ImageName, updateInfo.FilePath))
+				slog.Error("skip", "image", updateInfo.ImageName, "path", updateInfo.FilePath, "reason", "failed fetching tags")
 				return
 			}
 
