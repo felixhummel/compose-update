@@ -62,3 +62,31 @@ func ReadConfig() Config {
 
 	return cfg
 }
+
+// InitConfigPath returns the path where the config file would be written
+func InitConfigPath() string {
+	return filepath.Join(getConfigDir(), "compose-update")
+}
+
+// InitConfig writes the default config file
+func InitConfig() error {
+	configPath := InitConfigPath()
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("toml")
+	viper.Set("directory", ".")
+	viper.Set("log_level", "warning")
+	viper.Set("max_time", "5s")
+	viper.Set("dry_run", false)
+
+	configFile := filepath.Join(configPath, "config.toml")
+	if err := viper.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	fmt.Printf("Wrote config to %s\n", configFile)
+	return nil
+}

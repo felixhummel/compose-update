@@ -25,6 +25,7 @@ func (l UpdateLevel) IncludeMajor() bool { return l >= MajorLevel }
 
 type Flags struct {
 	Help        bool          // Show help message
+	Init        bool          // Write default config file
 	DryRun      bool          // Only check for updates, do not write
 	Directory   string        // Root directory to search for Docker Compose files
 	Image       string        // Single image to check (e.g. nginx:1.25.0)
@@ -48,6 +49,7 @@ func Parse(version string) Flags {
 	var major, minor, patch bool
 
 	flag.BoolVarP(&args.Help, "help", "h", false, "Show help message")
+	flag.BoolVar(&args.Init, "init", false, "Write default config file")
 	flag.BoolVarP(&args.DryRun, "dry-run", "n", false, "Only check for updates, do not write")
 	flag.StringVar(&args.Image, "image", "", "Check a single image (e.g. nginx:1.25.0)")
 	flag.StringVar(&args.Tags, "tags", "", "Print all tags for an image (e.g. postgres:14.5)")
