@@ -17,6 +17,7 @@ type UpdateChecker struct {
 	path     string
 	registry *Registry
 	exclude  []string
+	glob     []string
 }
 
 func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
@@ -29,6 +30,12 @@ func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
 func NewUpdateCheckerWithExclude(path string, registry *Registry, exclude []string) *UpdateChecker {
 	checker := NewUpdateChecker(path, registry)
 	checker.exclude = exclude
+	return checker
+}
+
+func NewUpdateCheckerWithGlob(path string, registry *Registry, exclude []string, glob []string) *UpdateChecker {
+	checker := NewUpdateCheckerWithExclude(path, registry, exclude)
+	checker.glob = glob
 	return checker
 }
 
@@ -57,6 +64,19 @@ func (u *UpdateChecker) isExcluded(image string) bool {
 	return false
 }
 
+func (u *UpdateChecker) isIncluded(image string) bool {
+	// If no glob patterns specified, all images are included (whitelist disabled)
+	if len(u.glob) == 0 {
+		return true
+	}
+	for _, pattern := range u.glob {
+		if matchesGlob(image, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 func (u *UpdateChecker) Check(level UpdateLevel) ([]UpdateInfo, error) {
 	updateInfos, err := u.createUpdateInfos()
 	if err != nil {
@@ -67,6 +87,11 @@ func (u *UpdateChecker) Check(level UpdateLevel) ([]UpdateInfo, error) {
 	for i, updateInfo := range updateInfos {
 		if u.isExcluded(updateInfo.FullImageName) {
 			slog.Warn("excluding", "image", updateInfo.FullImageName)
+			continue
+		}
+
+		if !u.isIncluded(updateInfo.FullImageName) {
+			slog.Info("not included by glob", "image", updateInfo.FullImageName)
 			continue
 		}
 

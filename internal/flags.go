@@ -29,6 +29,7 @@ type Flags struct {
 	DryRun      bool          // Only check for updates, do not write
 	Directory   string        // Root directory to search for Docker Compose files
 	Exclude     []string      // Image globs to exclude
+	Glob        []string      // Image globs to include (whitelist)
 	Image       string        // Single image to check (e.g. nginx:1.25.0)
 	Tags        string        // Print all tags for an image (e.g. postgres:14.5)
 	UpdateLevel UpdateLevel   // Level of updates to include (major, minor, patch)
@@ -60,6 +61,7 @@ func Parse(version string) Flags {
 	flag.BoolVarP(&args.Version, "version", "v", false, "Show version information")
 	flag.StringVarP(&args.LogLevel, "log-level", "l", "warning", "Log level (debug, info, warning, error)")
 	flag.StringArrayVarP(&args.Exclude, "exclude", "x", []string{}, "Image globs to exclude (repeatable)")
+	flag.StringArrayVarP(&args.Glob, "glob", "g", []string{}, "Image globs to include as whitelist (repeatable)")
 	flag.DurationVarP(&args.MaxTime, "max-time", "m", 5*time.Second, "HTTP request timeout per registry call")
 
 	flag.Parse()
@@ -96,6 +98,8 @@ func Parse(version string) Flags {
 
 	// Merge exclude patterns from config and flags
 	args.Exclude = append(cfg.Exclude, args.Exclude...)
+	// Merge glob patterns from config and flags
+	args.Glob = append(cfg.Glob, args.Glob...)
 
 	if patch || cfg.Patch {
 		args.UpdateLevel = PatchLevel

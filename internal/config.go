@@ -13,6 +13,7 @@ type Config struct {
 	DryRun      bool          `mapstructure:"dry_run"`
 	Directory   string        `mapstructure:"directory"`
 	Exclude     []string      `mapstructure:"exclude"`
+	Glob        []string      `mapstructure:"glob"`
 	Major       bool          `mapstructure:"major"`
 	Minor       bool          `mapstructure:"minor"`
 	Patch       bool          `mapstructure:"patch"`
@@ -49,6 +50,7 @@ func ReadConfig() Config {
 	viper.SetDefault("patch", false)
 	viper.SetDefault("dry_run", false)
 	viper.SetDefault("exclude", []string{})
+	viper.SetDefault("glob", []string{})
 
 	// Try to read config file (don't fail if it doesn't exist)
 	if err := viper.ReadInConfig(); err != nil {
