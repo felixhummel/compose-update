@@ -59,7 +59,7 @@ func Parse(version string) Flags {
 	flag.BoolVar(&patch, "patch", false, "Only update to the latest patch version")
 	flag.BoolVarP(&args.Version, "version", "v", false, "Show version information")
 	flag.StringVarP(&args.LogLevel, "log-level", "l", "warning", "Log level (debug, info, warning, error)")
-	flag.StringArrayVar(&args.Exclude, "exclude", []string{}, "Image globs to exclude (repeatable)")
+	flag.StringArrayVarP(&args.Exclude, "exclude", "x", []string{}, "Image globs to exclude (repeatable)")
 	flag.DurationVarP(&args.MaxTime, "max-time", "m", 5*time.Second, "HTTP request timeout per registry call")
 
 	flag.Parse()
