@@ -20,23 +20,25 @@ type UpdateChecker struct {
 	glob     []string
 }
 
-func NewUpdateChecker(path string, registry *Registry) *UpdateChecker {
+func NewUpdateChecker(path string, registry *Registry, options ...func(*UpdateChecker)) *UpdateChecker {
 	if registry == nil {
 		registry = NewRegistryWithTimeout(5 * time.Second)
 	}
-	return &UpdateChecker{path: path, registry: registry}
-}
-
-func NewUpdateCheckerWithExclude(path string, registry *Registry, exclude []string) *UpdateChecker {
-	checker := NewUpdateChecker(path, registry)
-	checker.exclude = exclude
+	checker := &UpdateChecker{path: path, registry: registry}
+	for _, opt := range options {
+		opt(checker)
+	}
 	return checker
 }
 
-func NewUpdateCheckerWithGlob(path string, registry *Registry, exclude []string, glob []string) *UpdateChecker {
-	checker := NewUpdateCheckerWithExclude(path, registry, exclude)
-	checker.glob = glob
-	return checker
+// WithExclude sets image globs to exclude
+func WithExclude(patterns []string) func(*UpdateChecker) {
+	return func(c *UpdateChecker) { c.exclude = patterns }
+}
+
+// WithGlob sets image globs as whitelist
+func WithGlob(patterns []string) func(*UpdateChecker) {
+	return func(c *UpdateChecker) { c.glob = patterns }
 }
 
 func matchesGlob(image, pattern string) bool {

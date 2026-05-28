@@ -14,6 +14,8 @@ compose-update --patch
 compose-update --minor
 # Dry-run: check without writing changes
 compose-update --dry-run
+# include images
+compose-update --glob caddy
 # skip images
 compose-update --exclude "postgres:*"
 ```
@@ -22,19 +24,28 @@ All subdirectories are scanned recursively for Docker Compose files.
 
 
 ## Flags
+```
+$ compose-update --help
+Usage: compose-update [flags] [directory]
 
-| Flag              | Description                              | Default   |
-| ----------------- | ---------------------------------------- | --------- |
-| `--patch`         | Only suggest patch version updates       | `false`   |
-| `--minor`         | Only suggest minor+patch version updates | `false`   |
-| `-n`, `--dry-run` | Check for updates without writing        | `false`   |
-| `-m`, `--max-time`| HTTP request timeout per registry call   | `5s`      |
-| `-l`, `--log-level`| Log level (debug, info, warning, error) | `warning` |
-| `-v`, `--version` | Show version                             | `false`   |
-| `-h`, `--help`    | Show help                                | `false`   |
+Arguments:
+  directory     Root directory to scan for Docker Compose files (default: ".")
 
-Without `--patch` or `--minor`, all updates (major, minor, patch) are shown.
-
+Flags:
+  -n, --dry-run               Only check for updates, do not write
+  -x, --exclude stringArray   Image globs to exclude (repeatable)
+  -g, --glob stringArray      Image globs to include as whitelist (repeatable)
+  -h, --help                  Show help message
+      --image string          Check a single image (e.g. nginx:1.25.0)
+      --init                  Write default config file
+  -l, --log-level string      Log level (debug, info, warning, error) (default "warning")
+      --major                 Include major version updates
+  -m, --max-time duration     HTTP request timeout per registry call (default 5s)
+      --minor                 Only update to the latest minor version
+      --patch                 Only update to the latest patch version
+      --tags string           Print all tags for an image (e.g. postgres:14.5)
+  -v, --version               Show version information
+```
 
 ## Installation
 ```bash
