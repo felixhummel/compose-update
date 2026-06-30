@@ -32,14 +32,6 @@ func parseLogLevel(s string) slog.Level {
 func main() {
 	flags := internal.Parse(version)
 
-	if flags.Init {
-		if err := internal.InitConfig(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
 	level := parseLogLevel(flags.LogLevel)
 	log := slog.New(customlogger.NewCustomHandler(level, os.Stderr))
 	slog.SetDefault(log)
