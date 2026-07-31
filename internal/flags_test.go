@@ -23,6 +23,7 @@ func TestParse(t *testing.T) {
 				UpdateLevel: MajorLevel,
 				LogLevel:    "warning",
 				MaxTime:     5 * time.Second,
+				Output:      OutputText,
 			},
 		},
 		{
@@ -33,6 +34,7 @@ func TestParse(t *testing.T) {
 				UpdateLevel: PatchLevel,
 				LogLevel:    "warning",
 				MaxTime:     5 * time.Second,
+				Output:      OutputText,
 			},
 		},
 		{
@@ -43,6 +45,18 @@ func TestParse(t *testing.T) {
 				UpdateLevel: MinorLevel,
 				LogLevel:    "warning",
 				MaxTime:     5 * time.Second,
+				Output:      OutputText,
+			},
+		},
+		{
+			name: "jsonl output",
+			args: []string{"--output", "jsonl"},
+			expected: Flags{
+				Directory:   ".",
+				UpdateLevel: MajorLevel,
+				LogLevel:    "warning",
+				MaxTime:     5 * time.Second,
+				Output:      OutputJSONL,
 			},
 		},
 		{
@@ -53,6 +67,7 @@ func TestParse(t *testing.T) {
 				UpdateLevel: MajorLevel,
 				LogLevel:    "warning",
 				MaxTime:     5 * time.Second,
+				Output:      OutputText,
 			},
 		},
 	}
@@ -80,6 +95,9 @@ func TestParse(t *testing.T) {
 			}
 			if result.MaxTime != tt.expected.MaxTime {
 				t.Errorf("MaxTime = %v, want %v", result.MaxTime, tt.expected.MaxTime)
+			}
+			if result.Output != tt.expected.Output {
+				t.Errorf("Output = %v, want %v", result.Output, tt.expected.Output)
 			}
 			if len(result.Exclude) != len(tt.expected.Exclude) {
 				t.Errorf("Exclude = %v, want %v", result.Exclude, tt.expected.Exclude)

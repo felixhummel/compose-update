@@ -89,5 +89,5 @@ func main() {
 		wg.Wait()
 	}
 
-	modes.Default(updateInfos, flags.DryRun)
+	modes.Default(updateInfos, flags.DryRun, flags.Output)
 }

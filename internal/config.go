@@ -19,6 +19,7 @@ type Config struct {
 	Patch       bool          `mapstructure:"patch"`
 	LogLevel    string        `mapstructure:"log_level"`
 	MaxTime     time.Duration `mapstructure:"max_time"`
+	Output      string        `mapstructure:"output"`
 }
 
 func getConfigDir() string {
@@ -51,6 +52,7 @@ func ReadConfig() Config {
 	viper.SetDefault("dry_run", false)
 	viper.SetDefault("exclude", []string{})
 	viper.SetDefault("glob", []string{})
+	viper.SetDefault("output", "text")
 
 	// Try to read config file (don't fail if it doesn't exist)
 	if err := viper.ReadInConfig(); err != nil {

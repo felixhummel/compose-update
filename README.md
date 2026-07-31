@@ -18,7 +18,16 @@ compose-update --dry-run
 compose-update --glob caddy
 # skip images
 compose-update --exclude "postgres:*"
+# machine-readable output (one JSON object per line)
+compose-update --dry-run --output jsonl
 ```
+
+`--output jsonl` prints one object per update:
+```json
+{"path":"docker-compose.yml","old":"postgres:14.5","new":"postgres:18.4"}
+```
+`path` is empty when checking a single image via `--image`. Unlike `text`, `jsonl` also
+reports updates that were written to disk (i.e. without `--dry-run`).
 
 All subdirectories are scanned recursively for Docker Compose files.
 
@@ -37,11 +46,11 @@ Flags:
   -g, --glob stringArray      Image globs to include as whitelist (repeatable)
   -h, --help                  Show help message
       --image string          Check a single image (e.g. nginx:1.25.0)
-      --init                  Write default config file
   -l, --log-level string      Log level (debug, info, warning, error) (default "warning")
       --major                 Include major version updates
   -m, --max-time duration     HTTP request timeout per registry call (default 5s)
       --minor                 Only update to the latest minor version
+  -o, --output string         Output format (text, jsonl) (default "text")
       --patch                 Only update to the latest patch version
       --tags string           Print all tags for an image (e.g. postgres:14.5)
   -v, --version               Show version information

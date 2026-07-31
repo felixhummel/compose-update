@@ -35,7 +35,14 @@ type Flags struct {
 	Version     bool          // Version of compose-update
 	LogLevel    string        // Log level (debug, info, warning, error)
 	MaxTime     time.Duration // HTTP request timeout
+	Output      string        // Output format (text, jsonl)
 }
+
+// Output formats
+const (
+	OutputText  = "text"
+	OutputJSONL = "jsonl"
+)
 
 func Parse(version string) Flags {
 	args := Flags{}
@@ -61,6 +68,7 @@ func Parse(version string) Flags {
 	flag.StringArrayVarP(&args.Exclude, "exclude", "x", []string{}, "Image globs to exclude (repeatable)")
 	flag.StringArrayVarP(&args.Glob, "glob", "g", []string{}, "Image globs to include as whitelist (repeatable)")
 	flag.DurationVarP(&args.MaxTime, "max-time", "m", 5*time.Second, "HTTP request timeout per registry call")
+	flag.StringVarP(&args.Output, "output", "o", OutputText, "Output format (text, jsonl)")
 
 	flag.Parse()
 
@@ -89,6 +97,13 @@ func Parse(version string) Flags {
 	}
 	if args.MaxTime == 5*time.Second {
 		args.MaxTime = cfg.MaxTime
+	}
+	if args.Output == OutputText {
+		args.Output = cfg.Output
+	}
+	if args.Output != OutputText && args.Output != OutputJSONL {
+		fmt.Fprintf(os.Stderr, "unknown output format %q, expected %q or %q\n", args.Output, OutputText, OutputJSONL)
+		os.Exit(2)
 	}
 	if !args.DryRun {
 		args.DryRun = cfg.DryRun
