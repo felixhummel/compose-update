@@ -42,7 +42,7 @@ func Default(updateInfos []internal.UpdateInfo, dryRun bool, output string) {
 
 		if !write {
 			if i.FilePath != "" {
-				fmt.Printf("%s: %s -> %s\n", i.FilePath, oldImage, newImage)
+				fmt.Printf("%s: %s %s -> %s\n", i.FilePath, i.ImageName, i.CurrentTag, i.LatestTag)
 			} else {
 				fmt.Printf("%s\n", newImage)
 			}
