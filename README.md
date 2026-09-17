@@ -81,3 +81,9 @@ make install-dev  # symlinks binary to ~/.local/bin/compose-update
 **GitHub Container Registry** (`ghcr.io`): calls the GitHub Releases API (`/releases/latest`) to get the current release tag directly, avoiding tag-list pagination entirely.
 
 **Other registries**: paginates the OCI `tags/list` endpoint, stopping early once pages no longer contain semver tags.
+
+
+## Update Snapshot Tests
+```
+go test ./internal -update
+```

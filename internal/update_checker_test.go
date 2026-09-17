@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -249,32 +251,29 @@ func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Work on a copy so Update() doesn't touch the fixture.
+	fixtureDir := "../tests/build-arg-img"
+	original, err := os.ReadFile(filepath.Join(fixtureDir, "docker-compose.yml"))
+	assert.NoError(t, err)
+	composePath := filepath.Join(t.TempDir(), "docker-compose.yml")
+	assert.NoError(t, os.WriteFile(composePath, original, 0644))
+
 	registry := NewRegistryForTest(server.URL)
-	updateChecker := NewUpdateChecker("../tests/build-arg-img/docker-compose.yml", registry)
+	updateChecker := NewUpdateChecker(composePath, registry)
 
 	result, err := updateChecker.Check(MajorLevel)
 	assert.NoError(t, err)
-
-	byImage := make(map[string]UpdateInfo)
 	for _, r := range result {
-		byImage[r.ImageName] = r
+		if r.HasNewVersion() {
+			assert.NoError(t, r.Update())
+		}
 	}
 
-	// v-prefixed: goes through Docker Hub name=v path → mock returns v999.0.0
-	assert.Equal(t, "v3.7.2", byImage["prom/prometheus"].CurrentTag)
-	assert.Equal(t, "v999.0.0", byImage["prom/prometheus"].LatestTag)
-
-	assert.Equal(t, "v1.10.2", byImage["prom/node-exporter"].CurrentTag)
-	assert.Equal(t, "v999.0.0", byImage["prom/node-exporter"].LatestTag)
-
-	// non-prefixed: goes through OCI path → mock returns 999.0.0
-	assert.Equal(t, "1.19.0", byImage["caddy"].CurrentTag)
-	assert.Equal(t, "999.0.0", byImage["caddy"].LatestTag)
-
-	assert.Equal(t, "4.39", byImage["authelia/authelia"].CurrentTag)
-	// 4.39 is parsed as 4.39.0 by Masterminds semver (lenient) → OCI path → update found
-	assert.Equal(t, "999.0.0", byImage["authelia/authelia"].LatestTag)
-
-	assert.Equal(t, "12.3.4", byImage["grafana/grafana"].CurrentTag)
-	assert.Equal(t, "999.0.0", byImage["grafana/grafana"].LatestTag)
+	// v-prefixed images go through the Docker Hub name=v path → v999.0.0;
+	// non-prefixed ones go through the OCI path → 999.0.0.
+	// Compare against tests/build-arg-img/expected.yml; regenerate with `go test ./internal -update`.
+	updated, err := os.ReadFile(composePath)
+	assert.NoError(t, err)
+	g := goldie.New(t, goldie.WithFixtureDir(fixtureDir), goldie.WithNameSuffix(".yml"))
+	g.Assert(t, "expected", updated)
 }
