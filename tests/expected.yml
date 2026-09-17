@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  # # Shouldn't be recognized by compose-update because of invalid semver
+  nginx-latest:
+    image: nginx:latest
+
+  # # Shouldn't be recognized by compose-update because of invalid semver
+  pytorch-latest:
+    image: pytorch/pytorch:latest
+
+  nginx:
+    image: nginx:999.0.0
+
+  redis:
+    image: redis:999.0.0
+
+  postgres:
+    image: postgres:999.0.0
+
+  alpine:
+    image: alpine:999.0.0
+
+  pytorch:
+    image: pytorch/pytorch:1.8.1-cuda11.1-cudnn8-runtime
+
+  forgejo:
+    image: data.forgejo.org/forgejo/forgejo:999.0.0
+
+  # ghcr.io
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v999.0.0

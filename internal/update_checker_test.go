@@ -232,33 +232,39 @@ services:
 	}
 }
 
-func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
-	// The fixture has both v-prefixed (prom/prometheus:v3.7.2, prom/node-exporter:v1.10.2)
-	// and non-prefixed (caddy:1.19.0, authelia/authelia:4.39, grafana/grafana:12.3.4) images.
-	// The mock server routes each case to the appropriate response format.
+// newMockRegistry serves canned tag lists for every registry code path:
+//   - Docker Hub web API with name=v (v-prefixed tags) → v999.0.0
+//   - GitHub releases API (ghcr.io images)              → v999.0.0
+//   - OCI tags/list (everything else)                   → 999.0.0
+func newMockRegistry(t *testing.T) *httptest.Server {
+	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.RawQuery, "service=") && strings.Contains(r.URL.RawQuery, "scope="):
-			// Token endpoint
 			w.Write([]byte(`{"token": "test"}`))
 		case strings.HasPrefix(r.URL.Path, "/v2/repositories/") && strings.Contains(r.URL.RawQuery, "name=v"):
-			// Docker Hub web API: v-prefixed images (prometheus, node-exporter)
 			w.Write([]byte(`{"results": [{"name": "v999.0.0"}], "next": null}`))
+		case strings.HasPrefix(r.URL.Path, "/repos/"):
+			w.Write([]byte(`{"tag_name": "v999.0.0"}`))
 		default:
-			// OCI tags/list: non-prefixed images (caddy, authelia, grafana)
 			w.Write([]byte(`{"tags": ["999.0.0"]}`))
 		}
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
+	return server
+}
 
-	// Work on a copy so Update() doesn't touch the fixture.
-	fixtureDir := "../tests/build-arg-img"
+// assertUpdatedCompose copies <fixtureDir>/docker-compose.yml to a temp dir, runs
+// Check + Update against the mock registry and compares the result with
+// <fixtureDir>/expected.yml. Regenerate with `go test ./internal -update`.
+func assertUpdatedCompose(t *testing.T, fixtureDir string) {
+	t.Helper()
 	original, err := os.ReadFile(filepath.Join(fixtureDir, "docker-compose.yml"))
 	assert.NoError(t, err)
 	composePath := filepath.Join(t.TempDir(), "docker-compose.yml")
 	assert.NoError(t, os.WriteFile(composePath, original, 0644))
 
-	registry := NewRegistryForTest(server.URL)
+	registry := NewRegistryForTest(newMockRegistry(t).URL)
 	updateChecker := NewUpdateChecker(composePath, registry)
 
 	result, err := updateChecker.Check(MajorLevel)
@@ -269,11 +275,19 @@ func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
 		}
 	}
 
-	// v-prefixed images go through the Docker Hub name=v path → v999.0.0;
-	// non-prefixed ones go through the OCI path → 999.0.0.
-	// Compare against tests/build-arg-img/expected.yml; regenerate with `go test ./internal -update`.
 	updated, err := os.ReadFile(composePath)
 	assert.NoError(t, err)
 	g := goldie.New(t, goldie.WithFixtureDir(fixtureDir), goldie.WithNameSuffix(".yml"))
 	g.Assert(t, "expected", updated)
+}
+
+func TestUpdateCheckerCheckBuildArgImgFixture(t *testing.T) {
+	// Mixes v-prefixed (prom/prometheus:v3.7.2, prom/node-exporter:v1.10.2) and
+	// non-prefixed (caddy:1.19.0, authelia/authelia:4.39, grafana/grafana:12.3.4) images.
+	assertUpdatedCompose(t, "../tests/build-arg-img")
+}
+
+func TestUpdateCheckerCheckMainFixture(t *testing.T) {
+	// Covers :latest (skipped), Docker Hub, a third-party OCI registry (forgejo) and ghcr.io.
+	assertUpdatedCompose(t, "../tests")
 }
