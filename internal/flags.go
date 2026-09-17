@@ -85,6 +85,11 @@ func Parse(version string) Flags {
 	// Read config file and apply defaults
 	cfg := ReadConfig()
 
+	if flag.NArg() > 1 {
+		fmt.Fprintf(os.Stderr, "unexpected arguments: %v\n\n", flag.Args()[1:])
+		flag.Usage()
+		os.Exit(2)
+	}
 	if flag.NArg() > 0 {
 		args.Directory = flag.Arg(0)
 	} else if args.Directory == "" {

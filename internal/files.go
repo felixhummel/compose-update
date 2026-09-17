@@ -9,6 +9,9 @@ func GetComposeFilePaths(root string) ([]string, error) {
 	var composeFilePaths []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			return nil
 		}
