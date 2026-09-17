@@ -86,7 +86,7 @@ func TestFetchImageTags_DualAuthHeader(t *testing.T) {
 func TestFetchImageTags_DockerHubAllTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case strings.Contains(r.URL.Path, "/tags") && strings.Contains(r.URL.RawQuery, "ordering=-last_updated"):
+		case strings.Contains(r.URL.Path, "/tags") && strings.Contains(r.URL.RawQuery, "ordering=last_updated"):
 			w.Write([]byte(`{"results":[` +
 				`{"name":"latest"},` +
 				`{"name":"1.25.3"},` +

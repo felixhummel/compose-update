@@ -17,6 +17,10 @@ import (
 
 const pageSize = 1000
 
+// Docker Hub clamps page_size to 100 and rejects anonymous requests beyond page 10.
+// Note: Docker Hub's ordering param is inverted — "last_updated" yields newest first.
+const dockerHubPageSize = 100
+
 type IRegistry interface {
 	FetchImageTags(image string) ([]string, error)
 }
@@ -191,7 +195,7 @@ func (r *Registry) FetchAllImageTags(image string) ([]string, error) {
 
 func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]string, error) {
 	var tags []string
-	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=-last_updated", repo, pageSize)
+	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=last_updated", repo, dockerHubPageSize)
 	maxPages := 50 // Limit pages to avoid timeouts; covers ~50k tags
 	for url != "" && maxPages > 0 {
 		maxPages--
@@ -202,6 +206,12 @@ func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]st
 		resp, _, err := do(r.client, req)
 		if err != nil {
 			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+			slog.Debug("Stopping Docker Hub pagination", "repo", repo, "status", resp.StatusCode, "tags_so_far", len(tags))
+			break
 		}
 		var result struct {
 			Results []struct {
@@ -224,7 +234,7 @@ func (r *Registry) fetchDockerHubAllTags(ctx context.Context, repo string) ([]st
 // ordered by last_updated descending. Returns all pages that contain semver tags.
 func (r *Registry) fetchDockerHubVPrefix(ctx context.Context, repo string) ([]string, error) {
 	var tags []string
-	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?name=v&page_size=%d&ordering=-last_updated", repo, pageSize)
+	url := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?name=v&page_size=%d&ordering=last_updated", repo, dockerHubPageSize)
 
 	for url != "" {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -294,7 +304,7 @@ func (r *Registry) fetchDockerHubLatestTags(ctx context.Context, repo string) ([
 	}
 
 	// Scan recent tags (ordered by last_updated) for semver tags sharing the same digest.
-	tagsURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=-last_updated", repo, pageSize)
+	tagsURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=last_updated", repo, dockerHubPageSize)
 	var tags []string
 
 	for tagsURL != "" {
@@ -554,7 +564,7 @@ func withPageSize(rawURL string) string {
 		return rawURL
 	}
 	q := u.Query()
-	q.Set("page_size", fmt.Sprintf("%d", pageSize))
+	q.Set("page_size", fmt.Sprintf("%d", dockerHubPageSize))
 	u.RawQuery = q.Encode()
 	return u.String()
 }
